@@ -5,8 +5,6 @@ from random import choice
 import requests
 from user_agent import generate_user_agent
 
-from crawler.errors import DownloadError
-
 BASE_REQUEST_HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Host': 'www.apkmirror.com',
@@ -25,7 +23,7 @@ def _get_request_headers() -> dict:
     """
     request_headers = BASE_REQUEST_HEADERS.copy()
 
-    # UA may be auto-generated for each new session / request.
+    # UA should be auto-generated for each new session / request.
     random_user_agent = generate_user_agent()
     request_headers['User-Agent'] = random_user_agent
 
@@ -33,7 +31,21 @@ def _get_request_headers() -> dict:
 
 
 @contextmanager
-def SpoofedHTTPClient(proxies: tp.List[str]):
+def ProxiedSession(proxies: tp.List[str]) -> tp.Generator[requests.Session, None, None]:
+    """
+    Session scoped HTTP client, which routes each request
+    via random proxy from provided proxies list.
+    For each request a new User agent is generated.
+
+    Usage:
+
+        with ProxiedSession(
+            proxies=['http://77.88.55.77:8081', 'http://77.88.55.70:8081']
+        ) as session:
+            session.get(...)
+
+    @contextmanager
+    """
     assert proxies, 'should instantiate HTTP client with at least one proxy'
 
     request_headers = _get_request_headers()
@@ -44,7 +56,5 @@ def SpoofedHTTPClient(proxies: tp.List[str]):
             'http': request_proxy,
             'https': request_proxy,
         }
-        try:
-            yield session
-        except DownloadError as exc:
-            raise DownloadError
+
+        yield session

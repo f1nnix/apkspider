@@ -1,25 +1,31 @@
+import typing as tp
 from itertools import islice
 
+from crawler.app import App
 from crawler.config import config
+from crawler.page import Page
 from crawler.spider import Spider
+from crawler.utils import apps_iterator
 
 
 def main():
-    spider = Spider(root_path=config.root_path,
-                    max_depth=config.max_depth)
-    apps = islice(spider, 0, config.apps_to_fetch)
+    spider: Spider = Spider(root_path=config.root_path,
+                            max_depth=config.max_depth)
 
-    for app in apps:
-        app.fetch_download_id()
-        app.download_file()
+    # Build unique pages generator
+    pages: tp.Generator[Page, None, None] = \
+        (page for page in spider)
 
-        with open('files.txt', 'w') as f:
-            for file in app.read_archive_content():
-                line = '{} – {} – {} - {}\n'.format(
-                    file.archive_name, file.file_name,
-                    file.mime_type, file.size_deflated)
+    # Build ranged apps generator
+    apps: tp.Generator[App, None, None] = \
+        apps_iterator(pages)
+    ranged_apps: tp.Union[islice, tp.Iterator[App]] = \
+        islice(apps, config.apps_to_fetch)
 
-                f.write(line)
+    with open('files.txt', 'a') as f:
+        for app in ranged_apps:
+            for file in app:
+                f.write(file.dumps())
 
 
 if __name__ == '__main__':
