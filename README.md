@@ -4,11 +4,11 @@ Recursive website crawler example.
 
 ## Features:
 
-* [DFS](https://en.wikipedia.org/wiki/Depth-first_search) graph traversal crawler, based on O(1)-structs — `set` and `deque`;
-* bypasses CloudFlare with self-hosted proxy-network and randomized sessions;
-* generators interface to reduce amount of data in memory and further piping.
+* [DFS](https://en.wikipedia.org/wiki/Depth-first_search) graph traversal crawler;
+* bypasses CloudFlare with self-deployed proxy-network and pseudo-randomized user sessions;
+* follows iterators interface close enough to reduce amount of App instances, stored in memory at once.
 
-For educational purposes only. Lacks a lot of features (mostly, multithreading or async processing).  
+For edu purposes only. Lacks a lot of features (mostly, multithreading or async processing).  
 
 **Output example:**
 
@@ -40,32 +40,32 @@ If Page download error occurs, DownloadError is raised. Page is re-scheduled to 
     # used to fetch data. Good choice: https://tinyproxy.github.io.
     # E.g: ['http://77.88.55.77:8081', 'http://77.88.55.70:8081']
     proxies: tp.List[str] = None
-    
-    # Amount of hops from root node to fetch, 
+
+    # Amount of hops from root node to fetch,
     # not actual depth of tree
     max_depth: int = 5
-    
+
     # Domain settings to crawl
     scheme: str = 'http'
     network_location: str = 'www.apkmirror.com'
-    
+
     # How much targer URLs to process
     apps_to_fetch: int = 2000
-    
+
     # Root node path to traverse from
     root_path: str = '/'
-    
+
     # How much times to re-download Page
     max_retries_count: int = 3
-    
+
     # Will be used, when file in archive
     # has neither known mime-type nor extension
     # ref:http://www.rfc-editor.org/rfc/rfc2046.txt
     unknown_mime_failback = 'application/octet-stream'
-    
-    # Path to handler to actual download files.
-    # Site-specific setting, may be removed.
+
+    # Site-specific settings, may be different for other instances
     download_handler_path = '/wp-content/themes/APKMirror/download.php'
+    download_app_page_suffix = '-download/'
 
 ### Configuring proxies
 

@@ -13,11 +13,29 @@ from bs4.element import Tag
 
 from crawler.config import config
 from crawler.errors import DownloadError
-from crawler.http_client import SpoofedHTTPClient
-from crawler.struct import File, AppState
+from crawler.proxied_session import ProxiedSession
+from crawler.structs import File, AppState
 
 
 class App:
+    """
+    Downloads and analysis contests of fetched APK.
+    Provides APK contents as iterable Generator[File].
+
+    Usage:
+
+        path = '/apk/google-inc...'
+        app: App = App(path=path)
+
+        app.fetch_download_id()
+        app.download_file()
+
+        for file in app:
+            ...
+
+    @iterable
+    """
+
     def __init__(self, path: str, logger: Logger = None):
         self.path: str = path
         self.download_id: tp.Optional[int] = None
@@ -39,29 +57,61 @@ class App:
     def __str__(self):
         return self.path
 
-    def fetch_download_id(self):
+    def __iter__(self) -> tp.Generator[File, None, None]:
+        """
+        Iterates over fulfilled File object
+        and yields each file info of downloaded APK.
+        """
+        with ZipFile(self.tempfile) as zipfile:
+            for zipinfo in zipfile.infolist():
+                file: File = File()
 
-        assert self.state == AppState.INITIALIZED
+                file.archive_name = self.filename
+                file.file_name = zipinfo.filename
+                file.mime_type = self._get_mime_type(zipinfo.filename)
+                file.size_deflated = zipinfo.file_size
+                file.size_compressed = zipinfo.compress_size
 
-        with SpoofedHTTPClient(proxies=config.proxies) as session:
+                yield file
+
+        # FIXME: this may be swallowed by context manager
+        self.tempfile.close()
+
+    def fetch_download_id(self) -> None:
+        """
+        APKMirror uses proxy pages to provide links for downloading APK.
+        Target path looks like '/wp-content/themes/APKMirror/download.php?id=<download_id>'
+
+        <download_id> is simply WordPress post ID.
+
+        To obtain real Wordpress post ID we need to download proxy page.
+        After which Wordpress ID be trivially retrieved from 'shortlink'
+        link meta tag of proxy page.
+
+        ref:self._extract_download_id
+        """
+        # assert self.state == AppState.INITIALIZED
+
+        with ProxiedSession(proxies=config.proxies) as session:
             response = session.get(self.absolute_app_url)
             if response.status_code != 200:
                 raise DownloadError
 
             self.download_id = self._extract_download_id(response.content)
 
+        self.logger.info('Fetched download ID for app %s' % self.path)
         self.state = AppState.FETCHED
 
-    def download_file(self):
+    def download_file(self) -> None:
         """
-        We explicitly don't close tempfile until content is extracted
-        or App instance will be force removed by garbage collector.
+        We explicitly don't close tempfile until:
 
-        :return:
+        - content is extracted;
+        - App instance will be force removed by garbage collector.
         """
-        assert self.state == AppState.FETCHED
+        # assert self.state == AppState.FETCHED
 
-        with SpoofedHTTPClient(proxies=config['proxies']) as session:
+        with ProxiedSession(proxies=config.proxies) as session:
             response = session.get(self.absolute_download_url)
             assert response.status_code == 200
 
@@ -70,13 +120,20 @@ class App:
 
         self.filename = self._extract_archive_name_from_url(response.url)
         self.state = AppState.DOWNLOADED
+        self.logger.info('Downloaded new APK: %s' % self.filename)
 
     def _extract_download_id(self, html: str) -> tp.Optional[int]:
+        """
+        Extracts actual Wordpress ID for APK attachment
+        from download proxy page HTML contests from 'shortlink'
+        link meta tag.
+        """
         soup = BeautifulSoup(html, 'html.parser')
         wordpress_shortlink_tag: Tag = soup.find('link', rel='shortlink')
+
         shortlink_href = wordpress_shortlink_tag.attrs.get('href')
         if not shortlink_href:
-            ...
+            return None
 
         query_param, download_id = shortlink_href.split('=')
         try:
@@ -105,30 +162,19 @@ class App:
 
         return config.unknown_mime_failback
 
-    def read_archive_content(self) -> File:
-        assert self.state == AppState.DOWNLOADED
-
-        with ZipFile(self.tempfile) as zipfile:
-            for zipinfo in zipfile.infolist():
-                file: File = File()
-                file.archive_name = self.filename
-                file.file_name = zipinfo.filename
-                file.mime_type = self._get_mime_type(zipinfo.filename)
-                file.size_deflated = zipinfo.file_size
-                file.size_compressed = zipinfo.compress_size
-
-                yield file
-
-        self.tempfile.close()
-
     @property
     def absolute_app_url(self):
+        if not self.path:
+            return None
+
         return urlunsplit(
             (config.scheme, config.network_location, self.path, None, None,))
 
     @property
     def absolute_download_url(self):
-        query = f'id={self.download_id}'
+        if not self.download_id:
+            return None
 
+        query = f'id={self.download_id}'
         return urlunsplit(
             (config.scheme, config.network_location, config.download_handler_path, query, None,))

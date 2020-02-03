@@ -1,22 +1,45 @@
 import typing as tp
 from urllib.parse import urlparse
 
+from crawler.app import App
+from crawler.config import config
 
-def get_url_path(url: str) -> tp.Optional[str]:
-    url_path = urlparse(url)
 
-    # Don't handle external links
-    # if not url_path.hostname:
-    #     import pdb; pdb.set_trace()
-    if url_path.netloc and not url_path.netloc.endswith('apkmirror.com'):
+def get_path_from_url(url: str) -> tp.Optional[str]:
+    """
+    Returns normalized parsed path part from absolute URL.
+    Fragments or query parameters are stripped. E.g.:
+
+        https://github.com/urllib/master => /urllib/master
+    """
+    scheme, netloc, path, params, query, fragment = \
+        urlparse(url)
+
+    # Don't allow external links
+    if netloc and \
+            not netloc.endswith(config.network_location):
         return None
 
-    # Normalize root paths
-    if not url_path.path:
+    # If we got nothing as path,
+    # consider we're fetched root node
+    if not path:
         return '/'
 
-    return url_path.path
+    return path
 
 
 def is_url_allowed(path: str) -> bool:
-    return path.startswith('/apk') or path.startswith('/page')
+    """
+    Return True, is path has prefix,
+    whitelisted for crawling.
+    """
+    return path.startswith('/apk/') \
+           or path.startswith('/page/')
+
+
+def apps_iterator(pages: tp.Generator) -> tp.Generator[App, None, None]:
+    """
+    Helper iterator to generate Apps from Pages instances
+    """
+    for page in pages:
+        yield from page

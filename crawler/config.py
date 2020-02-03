@@ -31,11 +31,11 @@ class Config:
     # ref:http://www.rfc-editor.org/rfc/rfc2046.txt
     unknown_mime_failback = 'application/octet-stream'
 
-    # Path to handler to actual download files.
-    # Site-specific setting, may be removed.
+    # Site-specific settings, may be different for other instances
     download_handler_path = '/wp-content/themes/APKMirror/download.php'
+    download_app_page_suffix = '-download/'
 
 
 config = Config(proxies=[
-
+    ...
 ])
