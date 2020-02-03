@@ -1,0 +1,9 @@
+---
+- hosts: all
+  roles:
+    - oefenweb.tinyproxy
+  vars:
+    tinyproxy_port: 41318
+    tinyproxy_allow:
+      - "{{ ansible_lo['ipv4']['address'] }}"
+      - "{{ ansible_default_ipv4['address'] }}"
