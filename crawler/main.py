@@ -1,11 +1,11 @@
 import typing as tp
-from itertools import islice
+from itertools import chain, islice
 
 from crawler.app import App
 from crawler.config import config
 from crawler.page import Page
 from crawler.spider import Spider
-from itertools import chain
+
 
 def main():
     spider: Spider = Spider(root_path=config.root_path,
