@@ -35,11 +35,3 @@ def is_url_allowed(path: str) -> bool:
     """
     return path.startswith('/apk/') \
            or path.startswith('/page/')
-
-
-def apps_iterator(pages: tp.Generator) -> tp.Generator[App, None, None]:
-    """
-    Helper iterator to generate Apps from Pages instances
-    """
-    for page in pages:
-        yield from page
